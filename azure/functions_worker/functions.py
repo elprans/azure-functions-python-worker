@@ -2,8 +2,6 @@ import inspect
 import operator
 import typing
 
-import azure.functions as azf
-
 from . import bindings
 from . import protos
 from . import typing_inspect
@@ -83,21 +81,6 @@ class Registry:
                 return_binding_name = desc.type
                 assert return_binding_name is not None
 
-                return_is_generic_binding = (
-                    desc.data_type is protos.BindingInfo.binary
-                    or desc.data_type is protos.BindingInfo.string
-                )
-
-                if not bindings.is_binding(return_binding_name):
-                    if return_is_generic_binding:
-                        return_binding_name = 'generic'
-                    else:
-                        raise FunctionLoadError(
-                            func_name,
-                            f'unsupported data type in {name} binding: '
-                            f'"{desc.type}"'
-                        )
-
                 has_return = True
             else:
                 bound_params[name] = desc
@@ -107,8 +90,7 @@ class Registry:
             params.pop('context')
             if 'context' in annotations:
                 ctx_anno = annotations.get('context')
-                if (not isinstance(ctx_anno, type) or
-                        not issubclass(ctx_anno, azf.Context)):
+                if not isinstance(ctx_anno, type):
                     raise FunctionLoadError(
                         func_name,
                         f'the "context" parameter is expected to be of '
@@ -136,8 +118,8 @@ class Registry:
             is_param_out = (
                 param_has_anno and
                 (typing_inspect.is_generic_type(param_anno) and
-                 typing_inspect.get_origin(param_anno) == azf.Out) or
-                param_anno == azf.Out)
+                 typing_inspect.get_origin(param_anno).__name__ == 'Out') or
+                param_anno.__name__ == 'Out')
 
             is_binding_out = desc.direction == protos.BindingInfo.out
 
@@ -183,23 +165,6 @@ class Registry:
                     f'is azure.functions.Out in Python')
 
             param_bind_type = desc.type
-            generic_binding = False
-
-            if not bindings.is_binding(param_bind_type):
-                generic_binding = (
-                    desc.data_type is protos.BindingInfo.binary
-                    or desc.data_type is protos.BindingInfo.string
-                )
-                if generic_binding:
-                    # Allow bindings marked with `dataType: binary` or
-                    # `dataType: string` to be handled by a generic binding.
-                    param_bind_type = 'generic'
-                else:
-                    raise FunctionLoadError(
-                        func_name,
-                        f'unsupported data type in {param.name} binding: '
-                        f'"{desc.type}"'
-                    )
 
             if param_has_anno:
                 if is_param_out:
@@ -240,7 +205,7 @@ class Registry:
         if return_binding_name is not None and 'return' in annotations:
             return_anno = annotations.get('return')
             if (typing_inspect.is_generic_type(return_anno) and
-                    typing_inspect.get_origin(return_anno) == azf.Out):
+                    typing_inspect.get_origin(return_anno).__name__ == 'Out'):
                 raise FunctionLoadError(
                     func_name,
                     f'return annotation should not be azure.functions.Out')

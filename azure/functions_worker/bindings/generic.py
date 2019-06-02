@@ -1,12 +1,9 @@
 import typing
 
-from . import meta
 from .. import protos
 
 
-class GenericConverter(meta.InConverter,
-                       meta.OutConverter,
-                       binding='generic'):
+class GenericBinding:
 
     @classmethod
     def check_input_type_annotation(
